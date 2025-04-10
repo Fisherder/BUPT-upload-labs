@@ -1,4 +1,4 @@
-# BayesSpam
+# BayesSpamEmail
 
 一个使用 Python 实现的基于贝叶斯分类的简单垃圾邮件识别器。
 
