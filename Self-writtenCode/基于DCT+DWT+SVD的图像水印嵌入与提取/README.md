@@ -44,8 +44,11 @@ $$
 
 - 对图像YUV三通道中的Y通道进行三级DWT变换（使用LL子带）
 - 对HH2（三级变换后的HH子带）进行DCT变换
-- 分别对水印图像和HH2_dct（DCT变换后的HH2）进行SVD得到奇异值SW和HSW
-- 对HSW进行替换：$$HSW=HSW+\alpha*SW(\alpha为嵌入因子)$$
+- 分别对水印图像和HH2_dct（DCT变换后的HH2）进行SVD得到奇异值$SW$和$HSW$
+- 对HSW进行替换：
+$$
+HSW=HSW+\alpha*SW(\alpha为嵌入因子)
+$$
 - 对替换后的HSW进行DCT逆变换及三级DWT逆变换得到替换后的Y通道
 - 使用替换后的Y通道替换原始图像的Y通道，并变换为RGB通道得到嵌入水印后的图像
 
@@ -54,8 +57,11 @@ $$
 - 对嵌入水印后的图像YUV三通道中的Y通道进行三级DWT变换（使用LL子带）
 - 对HH2（三级变换后的HH子带）进行DCT变换得到HH2_Ydct_watermarked
 - 对水印图像进行SVD得到UW、VW
-- 对HH2_Ydct_watermarked进行SVD的到$HSW'$
-- 使用HSW'和HSW得到SW：$$SW=\frac{HSW'-HSW}{\alpha}$$
+- 对HH2_Ydct_watermarked进行SVD的到HSW'
+- 使用HSW'和HSW得到SW：
+$$
+SW=\frac{HSW'-HSW}{\alpha}
+$$
 - 使用UW、SW、VW得到水印图像
 
 ### 2.3 攻击图像
