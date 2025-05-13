@@ -1,33 +1,35 @@
-import random
+import secrets
 import math
+import logging
+from typing import Tuple
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+__all__ = ["rsa_keygen", "rsa_encrypt", "rsa_decrypt"]
 
 
-def _is_prime(n: int, k: int = 5) -> bool:
-    """
-    Miller-Rabin素数检测算法
-    n: 待检测数
-    k: 检测轮数
-    return: 是否为素数
-    """
+def is_prime(n: int, k: int = 5) -> bool:
+    """Miller–Rabin probabilistic primality test."""
     if n <= 1:
         return False
-    for p in [2, 3, 5, 7, 11, 13, 17, 19, 23, 29]:
+    # Small primes check
+    for p in (2, 3, 5, 7, 11, 13, 17, 19, 23, 29):
         if n % p == 0:
             return n == p
 
-    # 将n-1分解为d*2^s
-    d = n - 1
-    s = 0
-    while d % 2 == 0:
-        d //= 2
+    # Write n - 1 as d * 2**s
+    s, d = 0, n - 1
+    while d & 1 == 0:
+        d >>= 1
         s += 1
 
     for _ in range(k):
-        a = random.randint(2, min(n - 2, 2**20))
+        a = secrets.randbelow(n - 3) + 2  # in [2, n-2]
         x = pow(a, d, n)
-        if x == 1 or x == n - 1:
+        if x in (1, n - 1):
             continue
-        for __ in range(s - 1):
+        for _ in range(s - 1):
             x = pow(x, 2, n)
             if x == n - 1:
                 break
@@ -36,107 +38,74 @@ def _is_prime(n: int, k: int = 5) -> bool:
     return True
 
 
-def _generate_prime(bits: int = 1024) -> int:
-    """
-    生成指定位数的素数
-    bits: 素数位数
-    return: 生成的素数
-    """
+def generate_prime(bits: int = 1024) -> int:
+    """Generate a prime number of specified bit length."""
     while True:
-        p = random.getrandbits(bits)
-        p |= (1 << bits - 1) | 1  # 确保最高位为1且为奇数
-        if _is_prime(p):
-            return p
+        candidate = secrets.randbits(bits) | (1 << (bits - 1)) | 1
+        if is_prime(candidate):
+            logger.debug("Generated prime of %d bits", bits)
+            return candidate
 
 
-def _modinv(a: int, m: int) -> int:
-    """
-    扩展欧几里得算法求模逆元
-    return: a⁻¹ mod m
-    """
-    g, x, y = _ex_gcd(a, m)
+def ex_gcd(a: int, b: int) -> Tuple[int, int, int]:
+    """Extended Euclidean algorithm. Returns (g, x, y) with ax + by = g = gcd(a, b)."""
+    if a == 0:
+        return b, 0, 1
+    g, x1, y1 = ex_gcd(b % a, a)
+    return g, y1 - (b // a) * x1, x1
+
+
+def modinv(a: int, m: int) -> int:
+    """Modular inverse of a modulo m."""
+    g, x, _ = ex_gcd(a, m)
     if g != 1:
-        raise ValueError("模逆不存在")
+        raise ValueError(f"No modular inverse for {a} mod {m}")
     return x % m
 
 
-def _ex_gcd(a: int, b: int) -> tuple:
+def rsa_keygen(bits: int = 2048) -> Tuple[Tuple[int, int], Tuple[int, int]]:
     """
-    扩展欧几里得算法
-    return: (gcd, x, y) 满足 ax + by = gcd(a, b)
+    Generate RSA key pair.
+    Returns ((n, e), (n, d)).
     """
-    if a == 0:
-        return (b, 0, 1)
-    else:
-        g, y, x = _ex_gcd(b % a, a)
-        return (g, x - (b // a) * y, y)
+    p = generate_prime(bits // 2)
+    q = generate_prime(bits // 2)
+    while q == p:
+        q = generate_prime(bits // 2)
 
-
-def rsa_keygen(bits: int = 2048) -> tuple:
-    """
-    RSA密钥生成函数
-    bits: 模数n的位数
-    return: (公钥(n, e), 私钥(n, d))
-    """
-    # 生成两个不同的大素数
-    p = _generate_prime(bits // 2)
-    q = _generate_prime(bits // 2)
-    while p == q:
-        q = _generate_prime(bits // 2)
-
-    # 生成n
     n = p * q
     phi = (p - 1) * (q - 1)
 
-    # 选择公钥指数e
-    e = 65537  # 常用公钥指数65537
-    assert math.gcd(e, phi) == 1, "e与φ(n)不互质，请重新生成密钥"
+    e = 65537
+    if math.gcd(e, phi) != 1:
+        raise ValueError("e and phi(n) are not coprime")
 
-    # 计算私钥指数d
-    d = _modinv(e, phi)
+    d = modinv(e, phi)
+    logger.info("RSA key pair generated with modulus %d bits", bits)
+    return (n, e), (n, d)
 
-    return ((n, e), (n, d))
 
-
-def rsa_encrypt(m: int, public_key: tuple) -> int:
-    """
-    RSA加密
-    m: 明文（整数）
-    public_key: 公钥(n, e)
-    return: 密文c
-    """
+def rsa_encrypt(m: int, public_key: Tuple[int, int]) -> int:
+    """Encrypt integer m with public key (n, e)."""
     n, e = public_key
-    if m >= n:
-        raise ValueError("原文长度过长")
+    if m < 0 or m >= n:
+        raise ValueError("Message out of range")
     return pow(m, e, n)
 
 
-def rsa_decrypt(c: int, private_key: tuple) -> int:
-    """
-    RSA解密
-    c: 密文
-    private_key: 私钥(n, d)
-    return: 解密后的明文
-    """
+def rsa_decrypt(c: int, private_key: Tuple[int, int]) -> int:
+    """Decrypt integer c with private key (n, d)."""
     n, d = private_key
-    if c >= n:
-        raise ValueError("密文无效")
+    if c < 0 or c >= n:
+        raise ValueError("Ciphertext out of range")
     return pow(c, d, n)
 
 
-# 测试代码
 if __name__ == "__main__":
-    # 生成密钥对
-    public_key, private_key = rsa_keygen(2048)
-    print(f"公钥 (n, e):\n{public_key}")
-    print(f"\n私钥 (n, d):\n{private_key}")
+    pub, priv = rsa_keygen(2048)
+    print(f"Public key: {pub}\nPrivate key: {priv}")
 
-    # 测试加密解密
-    message = 123456789
-    ciphertext = rsa_encrypt(message, public_key)
-    decrypted = rsa_decrypt(ciphertext, private_key)
-
-    print(f"\n原始消息: {message}")
-    print(f"加密结果: {ciphertext}")
-    print(f"解密结果: {decrypted}")
-    print(f"加解密验证: {message == decrypted}")
+    msg = 123456789
+    ct = rsa_encrypt(msg, pub)
+    pt = rsa_decrypt(ct, priv)
+    print(f"Message: {msg}\nCipher: {ct}\nDecrypted: {pt}\nValid: {pt == msg}")
