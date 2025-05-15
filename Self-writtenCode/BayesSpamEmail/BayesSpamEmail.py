@@ -186,7 +186,7 @@ for fileName in testFileList:
     spam.addToDict(wordsList, wordsDict)
     testDict = wordsDict.copy()
     # 通过计算每个文件中p(s|w)来得到对分类影响最大的15个词
-    wordProbList = spam.getTestWords(testDict, spamDict, normDict, normFilelen, spamFilelen)
+    wordProbList = spam.get_test_words(testDict, spamDict, normDict, normFilelen, spamFilelen)
     # 对每封邮件得到的15个词计算贝叶斯概率
     p = spam.calBayes(wordProbList, spamDict, normDict)
     if (p > 0.9):
