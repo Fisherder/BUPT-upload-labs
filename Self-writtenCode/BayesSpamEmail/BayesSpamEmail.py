@@ -51,31 +51,58 @@ class SpamEmailBayes:
         filenames = os.listdir(filePath)
         return filenames
 
-    # 通过计算每个文件中p(s|w)来得到对分类影响最大的15个词
-    def getTestWords(self, testDict, spamDict, normDict, normFilelen, spamFilelen):
-        wordProbList = {}
-        for word, num in testDict.items():
-            if word in spamDict.keys() and word in normDict.keys():
-                # 该文件中包含词个数
-                pw_s = spamDict[word] / spamFilelen
-                pw_n = normDict[word] / normFilelen
+    # 通过计算每个文件中p(s|w)来得到对分类影响最大的15个词(原代码)
+    # def getTestWords(self, testDict, spamDict, normDict, normFilelen, spamFilelen):
+    #     wordProbList = {}
+    #     for word, num in testDict.items():
+    #         if word in spamDict.keys() and word in normDict.keys():
+    #             # 该文件中包含词个数
+    #             pw_s = spamDict[word] / spamFilelen
+    #             pw_n = normDict[word] / normFilelen
+    #             ps_w = pw_s / (pw_s + pw_n)
+    #             wordProbList.setdefault(word, ps_w)
+    #         if word in spamDict.keys() and word not in normDict.keys():
+    #             pw_s = spamDict[word] / spamFilelen
+    #             pw_n = 0.01
+    #             ps_w = pw_s / (pw_s + pw_n)
+    #             wordProbList.setdefault(word, ps_w)
+    #         if word not in spamDict.keys() and word in normDict.keys():
+    #             pw_s = 0.01
+    #             pw_n = normDict[word] / normFilelen
+    #             ps_w = pw_s / (pw_s + pw_n)
+    #             wordProbList.setdefault(word, ps_w)
+    #         if word not in spamDict.keys() and word not in normDict.keys():
+    #             # 若该词不在脏词词典中，概率设为0.4
+    #             wordProbList.setdefault(word, 0.4)
+    #     sorted(wordProbList.items(), key=lambda d: d[1], reverse=True)[0:15]
+    #     return (wordProbList)
+
+    # 通过计算每个文件中p(s|w)来得到对分类影响最大的15个词(修改后代码)
+    def get_test_words(self, test_dict, spam_dict, norm_dict, norm_file_len, spam_file_len):
+        """Get top 15 words with highest spam probability using Bayesian formula."""
+        word_prob_list = {}
+        for word, _ in test_dict.items():
+            if word in spam_dict and word in norm_dict:
+                pw_s = spam_dict[word] / spam_file_len
+                pw_n = norm_dict[word] / norm_file_len
                 ps_w = pw_s / (pw_s + pw_n)
-                wordProbList.setdefault(word, ps_w)
-            if word in spamDict.keys() and word not in normDict.keys():
-                pw_s = spamDict[word] / spamFilelen
-                pw_n = 0.01
+                word_prob_list[word] = ps_w
+            elif word in spam_dict and word not in norm_dict:
+                pw_s = spam_dict[word] / spam_file_len
+                pw_n = 0.01  # Small smoothing value for unseen normal words
                 ps_w = pw_s / (pw_s + pw_n)
-                wordProbList.setdefault(word, ps_w)
-            if word not in spamDict.keys() and word in normDict.keys():
-                pw_s = 0.01
-                pw_n = normDict[word] / normFilelen
+                word_prob_list[word] = ps_w
+            elif word not in spam_dict and word in norm_dict:
+                pw_s = 0.01  # Small smoothing value for unseen spam words
+                pw_n = norm_dict[word] / norm_file_len
                 ps_w = pw_s / (pw_s + pw_n)
-                wordProbList.setdefault(word, ps_w)
-            if word not in spamDict.keys() and word not in normDict.keys():
-                # 若该词不在脏词词典中，概率设为0.4
-                wordProbList.setdefault(word, 0.4)
-        sorted(wordProbList.items(), key=lambda d: d[1], reverse=True)[0:15]
-        return (wordProbList)
+                word_prob_list[word] = ps_w
+            else:
+                # Default probability for words not in spam or normal dictionaries
+                word_prob_list[word] = 0.4
+        # Return top 15 words sorted by spam probability
+        sorted_probs = sorted(word_prob_list.items(), key=lambda d: d[1], reverse=True)[:15]
+        return dict(sorted_probs)
 
     # 计算贝叶斯概率
     def calBayes(self, wordList, spamdict, normdict):
