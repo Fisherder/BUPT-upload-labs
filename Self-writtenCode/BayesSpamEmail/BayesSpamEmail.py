@@ -6,11 +6,28 @@ import os
 
 
 class SpamEmailBayes:
-    # 获得停用词表
+    # 获得停用词表(原代码)
+    # def get_stop_words(self):
+    #     stop_list = []
+    #     for line in open(r'data\中文停用词表.txt',encoding="gbk"):
+    #         stop_list.append(line[:len(line) - 1])
+    #     return stop_list
+
+    # 获得停用词表(修改后的代码)
     def get_stop_words(self):
+        """Load stop words from file, handling file not found and encoding errors."""
         stop_list = []
-        for line in open(r'data\中文停用词表.txt',encoding="gbk"):
-            stop_list.append(line[:len(line) - 1])
+        file_path = os.path.join('data', '中文停用词表.txt')
+        try:
+            with open(file_path, encoding='gbk') as file:
+                for line in file:
+                    stop_list.append(line.strip())
+        except FileNotFoundError:
+            print(f"Error: Stop words file '{file_path}' not found.")
+            return stop_list
+        except UnicodeDecodeError:
+            print(f"Error: Failed to decode file '{file_path}' with gbk encoding.")
+            return stop_list
         return stop_list
 
     # 获得词典
