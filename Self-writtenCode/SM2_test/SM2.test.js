@@ -3,10 +3,10 @@ import { sm2 } from 'sm-crypto-v2';
 // SM2 加密解密测试
 describe('SM2 Encryption and Decryption', () => {
     const globalKeyPair = sm2.generateKeyPairHex(); // 生成全局密钥对
-    const globalPublicKey = globalKeyPair.publicKey; // 获取公钥
+    const globalPublicKey = globalKeyPair.publicKey; // 获取公 钥
     const globalPrivateKey = globalKeyPair.privateKey; // 获取私钥
 
-    const msgString = 'Hello, SM2!'; // 要加密的消息
+    const msgString = 'Hello, SM2!'; // 要加密的消息 
     const msgArray = new TextEncoder().encode(msgString); // 将字符串转换为 Uint8Array
 
     test('should encrypt and decrypt the message correctly', () => {
