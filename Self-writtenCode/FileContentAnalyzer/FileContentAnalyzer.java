@@ -1,7 +1,8 @@
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.InputStreamReader;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
+import java.nio.file.Path;
 import java.util.Scanner;
 
 /**
@@ -11,31 +12,34 @@ import java.util.Scanner;
 public class FileContentAnalyzer {
 
     public static void main(String[] args) {
-        Scanner scanner = new Scanner(System.in);
+        Scanner scanner = new Scanner(System.in, StandardCharsets.UTF_8);
         FileContentAnalyzer analyzer = new FileContentAnalyzer();
 
         System.out.println("欢迎使用文件内容统计工具");
         System.out.println("请输入文件路径（输入 'exit' 退出程序）：");
 
         while (true) {
-            String inputPath = scanner.nextLine();
+            String inputPath = scanner.nextLine().trim();
             if ("exit".equalsIgnoreCase(inputPath)) {
                 System.out.println("程序已退出。");
                 break;
             }
 
             try {
-                FileStats stats = analyzer.analyzeFile(inputPath);
-                System.out.println("\n统计结果：");
-                System.out.println("文件路径: " + inputPath);
-                System.out.println("行数: " + stats.getLines());
-                System.out.println("单词数: " + stats.getWords());
-                System.out.println("字符数: " + stats.getChars());
-                System.out.println("\n请输入下一个文件路径（输入 'exit' 退出程序）：");
-            } catch (Exception e) {
-                System.out.println("错误: " + e.getMessage());
-                System.out.println("请输入有效的文件路径：");
+                FileStats stats = analyzer.analyzeFile(Path.of(inputPath));
+                System.out.printf(
+                    "统计结果：\n文件路径: %s\n行数: %d\n单词数: %d\n字符数: %d%n%n",
+                    inputPath, stats.getLines(), stats.getWords(), stats.getChars()
+                );
+            } catch (InvalidPathException e) {
+                System.err.println("错误: 路径格式不正确 - " + e.getMessage());
+            } catch (IOException e) {
+                System.err.println("错误: 文件读取失败 - " + e.getMessage());
+            } catch (IllegalArgumentException e) {
+                System.err.println("错误: " + e.getMessage());
             }
+
+            System.out.println("请输入下一个文件路径（输入 'exit' 退出程序）：");
         }
 
         scanner.close();
@@ -46,40 +50,30 @@ public class FileContentAnalyzer {
      *
      * @param filePath 文件路径
      * @return 包含行数、单词数和字符数的 FileStats 对象
-     * @throws Exception 如果文件不存在或无法读取
+     * @throws IOException              如果文件不存在或无法读取
+     * @throws IllegalArgumentException 如果路径不是文件
      */
-    public FileStats analyzeFile(String filePath) throws Exception {
-        File file = new File(filePath);
-
-        if (!file.exists()) {
-            throw new Exception("文件不存在");
+    public FileStats analyzeFile(Path filePath) throws IOException {
+        if (!Files.exists(filePath)) {
+            throw new IllegalArgumentException("文件不存在: " + filePath);
+        }
+        if (!Files.isRegularFile(filePath)) {
+            throw new IllegalArgumentException("路径不是一个普通文件: " + filePath);
         }
 
-        if (!file.isFile()) {
-            throw new Exception("路径不是一个文件");
-        }
-
-        int lineCount = 0;
-        int wordCount = 0;
-        int charCount = 0;
-
-        try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(new FileInputStream(file), "UTF-8"))) {
-
-            String line;
-            while ((line = reader.readLine()) != null) {
-                lineCount++;
-
-                // 统计字符数（包括空格）
-                charCount += line.length();
-
-                // 统计单词数（以空格、制表符或换行符分隔）
-                String[] words = line.split("\\s+");
-                wordCount += words.length;
+        int lines = 0, words = 0, chars = 0;
+        // 直接使用 Files.lines 来读取每一行
+        try (var stream = Files.lines(filePath, StandardCharsets.UTF_8)) {
+            for (String line : (Iterable<String>) stream::iterator) {
+                lines++;
+                chars += line.length();
+                String trimmed = line.trim();
+                if (!trimmed.isEmpty()) {
+                    words += trimmed.split("\\s+").length;
+                }
             }
         }
-
-        return new FileStats(lineCount, wordCount, charCount);
+        return new FileStats(lines, words, chars);
     }
 
     /**
@@ -110,7 +104,7 @@ public class FileContentAnalyzer {
 
         @Override
         public String toString() {
-            return "行数: " + lines + ", 单词数: " + words + ", 字符数: " + chars;
+            return String.format("行数: %d, 单词数: %d, 字符数: %d", lines, words, chars);
         }
     }
 }
