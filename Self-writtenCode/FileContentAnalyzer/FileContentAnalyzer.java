@@ -16,6 +16,23 @@ public class FileContentAnalyzer {
         FileContentAnalyzer analyzer = new FileContentAnalyzer();
 
         System.out.println("欢迎使用文件内容统计工具");
+
+        if (args.length > 0) {
+            for (String inputPath : args) {
+                try {
+                    FileStats stats = analyzer.analyzeFile(Path.of(inputPath));
+                    System.out.printf(
+                        "统计结果：\n文件路径: %s\n行数: %d\n单词数: %d\n字符数: %d%n%n",
+                        inputPath, stats.getLines(), stats.getWords(), stats.getChars()
+                    );
+                } catch (Exception e) {
+                    System.err.println("处理 " + inputPath + " 时出错: " + e.getMessage());
+                }
+            }
+            // 参数模式下处理完就退出，不进入交互
+            scanner.close();
+            return;
+        }
         System.out.println("请输入文件路径（输入 'exit' 退出程序）：");
 
         while (true) {
