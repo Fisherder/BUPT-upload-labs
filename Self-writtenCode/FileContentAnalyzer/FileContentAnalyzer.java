@@ -66,7 +66,11 @@ public class FileContentAnalyzer {
         try (var stream = Files.lines(filePath, StandardCharsets.UTF_8)) {
             for (String line : (Iterable<String>) stream::iterator) {
                 lines++;
-                chars += line.length();
+                // 原来：
+                // chars += line.length();
+                // 新增：把系统行分隔符也算入字符数
+                chars += line.length() + System.lineSeparator().length();
+            
                 String trimmed = line.trim();
                 if (!trimmed.isEmpty()) {
                     words += trimmed.split("\\s+").length;
