@@ -41,8 +41,9 @@ public class FileContentAnalyzer {
 
             System.out.println("请输入下一个文件路径（输入 'exit' 退出程序）：");
         }
-
-        scanner.close();
+        
+        //删除scanner.close();
+        
     }
 
     /**
