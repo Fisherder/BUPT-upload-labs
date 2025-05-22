@@ -6,14 +6,7 @@ import os
 
 
 class SpamEmailBayes:
-    # 获得停用词表(原代码)
-    # def get_stop_words(self):
-    #     stop_list = []
-    #     for line in open(r'data\中文停用词表.txt',encoding="gbk"):
-    #         stop_list.append(line[:len(line) - 1])
-    #     return stop_list
-
-    # 获得停用词表(修改后的代码)
+    # 获得停用词表
     def get_stop_words(self):
         """Load stop words from file, handling file not found and encoding errors."""
         stop_list = []
@@ -51,33 +44,7 @@ class SpamEmailBayes:
         filenames = os.listdir(filePath)
         return filenames
 
-    # 通过计算每个文件中p(s|w)来得到对分类影响最大的15个词(原代码)
-    # def getTestWords(self, testDict, spamDict, normDict, normFilelen, spamFilelen):
-    #     wordProbList = {}
-    #     for word, num in testDict.items():
-    #         if word in spamDict.keys() and word in normDict.keys():
-    #             # 该文件中包含词个数
-    #             pw_s = spamDict[word] / spamFilelen
-    #             pw_n = normDict[word] / normFilelen
-    #             ps_w = pw_s / (pw_s + pw_n)
-    #             wordProbList.setdefault(word, ps_w)
-    #         if word in spamDict.keys() and word not in normDict.keys():
-    #             pw_s = spamDict[word] / spamFilelen
-    #             pw_n = 0.01
-    #             ps_w = pw_s / (pw_s + pw_n)
-    #             wordProbList.setdefault(word, ps_w)
-    #         if word not in spamDict.keys() and word in normDict.keys():
-    #             pw_s = 0.01
-    #             pw_n = normDict[word] / normFilelen
-    #             ps_w = pw_s / (pw_s + pw_n)
-    #             wordProbList.setdefault(word, ps_w)
-    #         if word not in spamDict.keys() and word not in normDict.keys():
-    #             # 若该词不在脏词词典中，概率设为0.4
-    #             wordProbList.setdefault(word, 0.4)
-    #     sorted(wordProbList.items(), key=lambda d: d[1], reverse=True)[0:15]
-    #     return (wordProbList)
-
-    # 通过计算每个文件中p(s|w)来得到对分类影响最大的15个词(修改后代码)
+    # 通过计算每个文件中p(s|w)来得到对分类影响最大的15个词
     def get_test_words(self, test_dict, spam_dict, norm_dict, norm_file_len, spam_file_len):
         """Get top 15 words with highest spam probability using Bayesian formula."""
         word_prob_list = {}
