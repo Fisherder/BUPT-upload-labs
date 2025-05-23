@@ -41,8 +41,9 @@ public class FileContentAnalyzer {
 
             System.out.println("请输入下一个文件路径（输入 'exit' 退出程序）：");
         }
-
-        scanner.close();
+        
+        //删除scanner.close();
+        
     }
 
     /**
@@ -62,9 +63,9 @@ public class FileContentAnalyzer {
         }
 
         int lines = 0, words = 0, chars = 0;
-        // 直接使用 Files.lines 来读取每一行
-        try (var stream = Files.lines(filePath, StandardCharsets.UTF_8)) {
-            for (String line : (Iterable<String>) stream::iterator) {
+        try (BufferedReader br = Files.newBufferedReader(filePath, StandardCharsets.UTF_8)) {
+            String line;
+            while ((line = br.readLine()) != null) {
                 lines++;
                 chars += line.length();
                 String trimmed = line.trim();
