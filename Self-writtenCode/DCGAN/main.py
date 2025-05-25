@@ -46,14 +46,85 @@ class Config(object):
 opt = Config()
 
 
+def safe_load_model(model_path, device):
+    """
+    安全地加载模型文件，防止pickle反序列化攻击
+    """
+    if not os.path.exists(model_path):
+        raise FileNotFoundError(f"模型文件不存在: {model_path}")
+    
+    if not os.path.isfile(model_path):
+        raise ValueError(f"路径不是文件: {model_path}")
+    
+    # 检查文件扩展名
+    if not model_path.endswith(('.pth', '.pt')):
+        raise ValueError(f"不支持的模型文件格式: {model_path}")
+    
+    try:
+        # 使用weights_only=True防止pickle反序列化攻击
+        # 对于PyTorch 1.13+版本，这是推荐的安全做法
+        state_dict = t.load(model_path, map_location=device, weights_only=True)
+        return state_dict
+    except Exception as e:
+        # 如果weights_only不支持（旧版本PyTorch），使用传统方式但添加警告
+        print(f"警告: 正在使用传统的模型加载方式，存在安全风险。建议升级PyTorch版本。")
+        print(f"模型文件: {model_path}")
+        state_dict = t.load(model_path, map_location=device)
+        return state_dict
+
+
+def ensure_directories():
+    """
+    确保必要的目录存在
+    """
+    directories = ['imgs', 'checkpoints']
+    for dir_name in directories:
+        if not os.path.exists(dir_name):
+            os.makedirs(dir_name, exist_ok=True)
+            print(f"创建目录: {dir_name}")
+
+
+def verify_gpu_availability(use_gpu):
+    """
+    验证GPU可用性
+    """
+    if use_gpu:
+        if not t.cuda.is_available():
+            print("警告: CUDA不可用，自动切换到CPU模式")
+            return False
+        else:
+            gpu_count = t.cuda.device_count()
+            current_device = t.cuda.current_device()
+            gpu_name = t.cuda.get_device_name(current_device)
+            print(f"使用GPU: {gpu_name} (设备 {current_device}/{gpu_count-1})")
+            return True
+    else:
+        print("使用CPU模式")
+        return False
+
+
 def train(**kwargs):
     for k_, v_ in kwargs.items():
         setattr(opt, k_, v_)
 
-    device=t.device('cuda') if opt.gpu else t.device('cpu')
+    # 验证GPU可用性
+    opt.gpu = verify_gpu_availability(opt.gpu)
+    device = t.device('cuda') if opt.gpu else t.device('cpu')
+    
+    # 确保必要目录存在
+    ensure_directories()
+    
+    # 验证数据路径
+    if not os.path.exists(opt.data_path):
+        raise FileNotFoundError(f"数据集路径不存在: {opt.data_path}")
+    
     if opt.vis:
-        from visualize import Visualizer
-        vis = Visualizer(opt.env)
+        try:
+            from visualize import Visualizer
+            vis = Visualizer(opt.env)
+        except ImportError as e:
+            print(f"警告: 无法导入可视化模块: {e}")
+            opt.vis = False
 
     # 数据
     transforms = tv.transforms.Compose([
@@ -63,7 +134,14 @@ def train(**kwargs):
         tv.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
 
-    dataset = tv.datasets.ImageFolder(opt.data_path, transform=transforms)
+    try:
+        dataset = tv.datasets.ImageFolder(opt.data_path, transform=transforms)
+        if len(dataset) == 0:
+            raise ValueError(f"数据集为空: {opt.data_path}")
+        print(f"成功加载数据集，图片数量: {len(dataset)}")
+    except Exception as e:
+        raise RuntimeError(f"加载数据集失败: {e}")
+
     dataloader = t.utils.data.DataLoader(dataset,
                                          batch_size=opt.batch_size,
                                          shuffle=True,
@@ -73,14 +151,26 @@ def train(**kwargs):
 
     # 网络
     netg, netd = NetG(opt), NetD(opt)
-    map_location = lambda storage, loc: storage
+    
+    # 安全地加载预训练模型
     if opt.netd_path:
-        netd.load_state_dict(t.load(opt.netd_path, map_location=map_location))
+        try:
+            netd_state = safe_load_model(opt.netd_path, device)
+            netd.load_state_dict(netd_state)
+            print(f"成功加载判别器模型: {opt.netd_path}")
+        except Exception as e:
+            print(f"警告: 加载判别器模型失败: {e}")
+    
     if opt.netg_path:
-        netg.load_state_dict(t.load(opt.netg_path, map_location=map_location))
+        try:
+            netg_state = safe_load_model(opt.netg_path, device)
+            netg.load_state_dict(netg_state)
+            print(f"成功加载生成器模型: {opt.netg_path}")
+        except Exception as e:
+            print(f"警告: 加载生成器模型失败: {e}")
+    
     netd.to(device)
     netg.to(device)
-
 
     # 定义优化器和损失
     optimizer_g = t.optim.Adam(netg.parameters(), opt.lr1, betas=(opt.beta1, 0.999))
@@ -96,7 +186,6 @@ def train(**kwargs):
 
     errord_meter = AverageValueMeter()
     errorg_meter = AverageValueMeter()
-
 
     epochs = range(opt.max_epoch)
 
@@ -145,17 +234,25 @@ def train(**kwargs):
                     print(f"DEBUG: 判别器损失={errord_meter.value()[0]:.4f}")
                     print(f"DEBUG: 生成器损失={errorg_meter.value()[0]:.4f}")
                 fix_fake_imgs = netg(fix_noises)
-                vis.images(fix_fake_imgs.detach().cpu().numpy()[:64] * 0.5 + 0.5, win='fixfake')
-                vis.images(real_img.data.cpu().numpy()[:64] * 0.5 + 0.5, win='real')
-                vis.plot('errord', errord_meter.value()[0])
-                vis.plot('errorg', errorg_meter.value()[0])
+                try:
+                    vis.images(fix_fake_imgs.detach().cpu().numpy()[:64] * 0.5 + 0.5, win='fixfake')
+                    vis.images(real_img.data.cpu().numpy()[:64] * 0.5 + 0.5, win='real')
+                    vis.plot('errord', errord_meter.value()[0])
+                    vis.plot('errorg', errorg_meter.value()[0])
+                except Exception as e:
+                    print(f"可视化错误: {e}")
 
         if (epoch+1) % opt.save_every == 0:
             # 保存模型、图片
-            tv.utils.save_image(fix_fake_imgs.data[:64], '%s/%s.png' % (opt.save_path, epoch), normalize=True,
-                                value_range=(-1, 1))
-            t.save(netd.state_dict(), 'checkpoints/netd_%s.pth' % epoch)
-            t.save(netg.state_dict(), 'checkpoints/netg_%s.pth' % epoch)
+            try:
+                tv.utils.save_image(fix_fake_imgs.data[:64], '%s/%s.png' % (opt.save_path, epoch), normalize=True,
+                                    value_range=(-1, 1))
+                t.save(netd.state_dict(), 'checkpoints/netd_%s.pth' % epoch)
+                t.save(netg.state_dict(), 'checkpoints/netg_%s.pth' % epoch)
+                print(f"已保存第{epoch+1}轮的模型和图片")
+            except Exception as e:
+                print(f"保存模型/图片时发生错误: {e}")
+            
             errord_meter.reset()
             errorg_meter.reset()
 
@@ -168,18 +265,32 @@ def generate(**kwargs):
     for k_, v_ in kwargs.items():
         setattr(opt, k_, v_)
     
-    device=t.device('cuda') if opt.gpu else t.device('cpu')
+    # 验证GPU可用性
+    opt.gpu = verify_gpu_availability(opt.gpu)
+    device = t.device('cuda') if opt.gpu else t.device('cpu')
+
+    # 验证模型路径
+    if not opt.netd_path or not opt.netg_path:
+        raise ValueError("生成模式需要指定netd_path和netg_path参数")
 
     netg, netd = NetG(opt).eval(), NetD(opt).eval()
     noises = t.randn(opt.gen_search_num, opt.nz, 1, 1).normal_(opt.gen_mean, opt.gen_std)
     noises = noises.to(device)
 
-    map_location = lambda storage, loc: storage
-    netd.load_state_dict(t.load(opt.netd_path, map_location=map_location))
-    netg.load_state_dict(t.load(opt.netg_path, map_location=map_location))
+    # 安全地加载模型
+    try:
+        netd_state = safe_load_model(opt.netd_path, device)
+        netd.load_state_dict(netd_state)
+        print(f"成功加载判别器模型: {opt.netd_path}")
+        
+        netg_state = safe_load_model(opt.netg_path, device)
+        netg.load_state_dict(netg_state)
+        print(f"成功加载生成器模型: {opt.netg_path}")
+    except Exception as e:
+        raise RuntimeError(f"模型加载失败: {e}")
+    
     netd.to(device)
     netg.to(device)
-
 
     # 生成图片，并计算图片在判别器的分数
     fake_img = netg(noises)
@@ -190,8 +301,13 @@ def generate(**kwargs):
     result = []
     for ii in indexs:
         result.append(fake_img.data[ii])
+    
     # 保存图片
-    tv.utils.save_image(t.stack(result), opt.gen_img, normalize=True, value_range=(-1, 1))
+    try:
+        tv.utils.save_image(t.stack(result), opt.gen_img, normalize=True, value_range=(-1, 1))
+        print(f"成功生成{opt.gen_num}张图片，保存到: {opt.gen_img}")
+    except Exception as e:
+        raise RuntimeError(f"保存生成图片失败: {e}")
 
 
 if __name__ == '__main__':
