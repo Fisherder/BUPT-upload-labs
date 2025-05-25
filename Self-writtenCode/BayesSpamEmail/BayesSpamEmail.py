@@ -3,9 +3,52 @@
 import re
 import jieba
 import os
+# 添加的依赖(PR1)--------------------
+from pathlib import Path
+import chardet
+import logging
+# 添加的依赖(PR1)--------------------
 
 
 class SpamEmailBayes:
+
+    # 添加的部分(PR1)-----------------------------------------------------------------------------------------------------
+    def __init__(self, base_dir="data"):
+        self.base_dir = Path(base_dir).resolve()  # 设置安全的基目录
+        logging.basicConfig(level=logging.INFO)
+
+    def _validate_path(self, file_path):
+        """确保文件路径在基目录内，防止路径遍历攻击。
+
+        Args:
+            file_path (str): 要验证的文件或文件夹路径。
+
+        Returns:
+            Path: 验证后的绝对路径。
+
+        Raises:
+            ValueError: 如果路径超出基目录。
+        """
+        full_path = (self.base_dir / file_path).resolve()
+        if self.base_dir not in full_path.parents and full_path != self.base_dir:
+            raise ValueError(f"无效路径：{file_path} 超出 {self.base_dir}")
+        return full_path
+
+    def _detect_encoding(self, file_path):
+        """检测文件的编码格式。
+
+        Args:
+            file_path (Path): 文件路径。
+
+        Returns:
+            str: 检测到的编码，默认为 'utf-8'。
+        """
+        with open(file_path, 'rb') as f:
+            result = chardet.detect(f.read(1000))  # 读取前 1000 字节检测
+        return result.get('encoding', 'utf-8')
+    # 添加的部分(PR1)-----------------------------------------------------------------------------------------------------
+    
+
     # 获得停用词表
     def get_stop_words(self):
         """Load stop words from file, handling file not found and encoding errors."""
@@ -84,7 +127,7 @@ class SpamEmailBayes:
         #         print(str(ps_w)+"////"+str(ps_n))
         return p
 
-        # 计算预测结果正确率
+    # 计算预测结果正确率
 
     def calAccuracy(self, testResult):
         rightCount = 0
@@ -161,7 +204,7 @@ for fileName in testFileList:
     else:
         testResult.setdefault(fileName, 0)
 # 计算分类准确率（测试集中文件名低于1000的为正常邮件）
-testAccuracy = spam.calAccuracy(testResult)
+testAccuracy = spam.calAccuracy(testResult) 
 for i, ic in testResult.items():
     print(i + "/" + str(ic))
 
