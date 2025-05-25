@@ -80,7 +80,10 @@ class SpamEmailBayes:
             print(f"Processing word: {word}, Probability: {prob:.4f}")
             ps_w *= (prob)
             ps_n *= (1 - prob)
-        p = ps_w / (ps_w + ps_n + 1e-9) # Add epsilon for stability
+        if (ps_w + ps_n) == 0:
+            p = 0.5 # Default to neutral if sum is zero
+        else:
+            p = ps_w / (ps_w + ps_n)
         #         print(str(ps_w)+"////"+str(ps_n))
         return p
 
