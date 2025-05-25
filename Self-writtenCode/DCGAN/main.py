@@ -1,6 +1,5 @@
 # coding:utf8
 import os
-import ipdb
 import torch as t
 import torchvision as tv
 import tqdm
@@ -28,7 +27,7 @@ class Config(object):
     env = 'GAN'  # visdom的env
     plot_every = 20  # 每间隔20 batch，visdom画图一次
 
-    debug_file = '/tmp/debuggan'  # 存在该文件则进入debug模式
+    debug_file = './debug_gan.flag'  # 存在该文件则进入debug模式
     d_every = 1  # 每1个batch训练一次判别器
     g_every = 5  # 每5个batch训练一次生成器
     save_every = 10  # 没10个epoch保存一次模型
@@ -140,7 +139,11 @@ def train(**kwargs):
             if opt.vis and ii % opt.plot_every == opt.plot_every - 1:
                 ## 可视化
                 if os.path.exists(opt.debug_file):
-                    ipdb.set_trace()
+                    # 安全的调试方式：仅设置断点标志，避免直接导入调试工具
+                    print("DEBUG: 检测到调试标志文件，进入调试模式")
+                    print(f"DEBUG: 当前epoch={epoch}, batch={ii}")
+                    print(f"DEBUG: 判别器损失={errord_meter.value()[0]:.4f}")
+                    print(f"DEBUG: 生成器损失={errorg_meter.value()[0]:.4f}")
                 fix_fake_imgs = netg(fix_noises)
                 vis.images(fix_fake_imgs.detach().cpu().numpy()[:64] * 0.5 + 0.5, win='fixfake')
                 vis.images(real_img.data.cpu().numpy()[:64] * 0.5 + 0.5, win='real')

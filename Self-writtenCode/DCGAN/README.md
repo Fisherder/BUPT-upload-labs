@@ -108,7 +108,7 @@ python main.py generate --nogpu --vis=False \
     env = 'GAN' # visdom的env
     plot_every = 20 # 每间隔20 batch，visdom画图一次
 
-    debug_file='/tmp/debuggan' # 存在该文件则进入debug模式
+    debug_file='./debug_gan.flag' # 存在该文件则进入debug模式（在项目目录下创建debug_gan.flag文件）
     d_every=1 # 每1个batch训练一次判别器
     g_every=5 # 每5个batch训练一次生成器
     decay_every=10 # 没10个epoch保存一次模型
