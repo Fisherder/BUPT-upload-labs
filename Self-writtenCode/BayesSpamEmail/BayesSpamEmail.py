@@ -8,9 +8,19 @@ import os
 class SpamEmailBayes:
     # 获得停用词表
     def get_stop_words(self):
+        """Load stop words from file, handling file not found and encoding errors."""
         stop_list = []
-        for line in open(r'data\中文停用词表.txt',encoding="gbk"):
-            stop_list.append(line[:len(line) - 1])
+        file_path = os.path.join('data', '中文停用词表.txt')
+        try:
+            with open(file_path, encoding='gbk') as file:
+                for line in file:
+                    stop_list.append(line.strip())
+        except FileNotFoundError:
+            print(f"Error: Stop words file '{file_path}' not found.")
+            return stop_list
+        except UnicodeDecodeError:
+            print(f"Error: Failed to decode file '{file_path}' with gbk encoding.")
+            return stop_list
         return stop_list
 
     # 获得词典
@@ -35,30 +45,31 @@ class SpamEmailBayes:
         return filenames
 
     # 通过计算每个文件中p(s|w)来得到对分类影响最大的15个词
-    def getTestWords(self, testDict, spamDict, normDict, normFilelen, spamFilelen):
-        wordProbList = {}
-        for word, num in testDict.items():
-            if word in spamDict.keys() and word in normDict.keys():
-                # 该文件中包含词个数
-                pw_s = spamDict[word] / spamFilelen
-                pw_n = normDict[word] / normFilelen
+    def get_test_words(self, test_dict, spam_dict, norm_dict, norm_file_len, spam_file_len):
+        """Get top 15 words with highest spam probability using Bayesian formula."""
+        word_prob_list = {}
+        for word, _ in test_dict.items():
+            if word in spam_dict and word in norm_dict:
+                pw_s = spam_dict[word] / spam_file_len
+                pw_n = norm_dict[word] / norm_file_len
                 ps_w = pw_s / (pw_s + pw_n)
-                wordProbList.setdefault(word, ps_w)
-            if word in spamDict.keys() and word not in normDict.keys():
-                pw_s = spamDict[word] / spamFilelen
-                pw_n = 0.01
+                word_prob_list[word] = ps_w
+            elif word in spam_dict and word not in norm_dict:
+                pw_s = spam_dict[word] / spam_file_len
+                pw_n = 0.01  # Small smoothing value for unseen normal words
                 ps_w = pw_s / (pw_s + pw_n)
-                wordProbList.setdefault(word, ps_w)
-            if word not in spamDict.keys() and word in normDict.keys():
-                pw_s = 0.01
-                pw_n = normDict[word] / normFilelen
+                word_prob_list[word] = ps_w
+            elif word not in spam_dict and word in norm_dict:
+                pw_s = 0.01  # Small smoothing value for unseen spam words
+                pw_n = norm_dict[word] / norm_file_len
                 ps_w = pw_s / (pw_s + pw_n)
-                wordProbList.setdefault(word, ps_w)
-            if word not in spamDict.keys() and word not in normDict.keys():
-                # 若该词不在脏词词典中，概率设为0.4
-                wordProbList.setdefault(word, 0.4)
-        sorted(wordProbList.items(), key=lambda d: d[1], reverse=True)[0:15]
-        return (wordProbList)
+                word_prob_list[word] = ps_w
+            else:
+                # Default probability for words not in spam or normal dictionaries
+                word_prob_list[word] = 0.4
+        # Return top 15 words sorted by spam probability
+        sorted_probs = sorted(word_prob_list.items(), key=lambda d: d[1], reverse=True)[:15]
+        return dict(sorted_probs)
 
     # 计算贝叶斯概率
     def calBayes(self, wordList, spamdict, normdict):
@@ -66,15 +77,14 @@ class SpamEmailBayes:
         ps_n = 1
 
         for word, prob in wordList.items():
-            print(word + "/" + str(prob))
+            print(f"Processing word: {word}, Probability: {prob:.4f}")
             ps_w *= (prob)
             ps_n *= (1 - prob)
-        p = ps_w / (ps_w + ps_n)
+        p = ps_w / (ps_w + ps_n + 1e-9) # Add epsilon for stability
         #         print(str(ps_w)+"////"+str(ps_n))
         return p
 
-        # 计算预测结果正确率
-
+    # 计算预测结果正确率
     def calAccuracy(self, testResult):
         rightCount = 0
         errorCount = 0
@@ -142,7 +152,7 @@ for fileName in testFileList:
     spam.addToDict(wordsList, wordsDict)
     testDict = wordsDict.copy()
     # 通过计算每个文件中p(s|w)来得到对分类影响最大的15个词
-    wordProbList = spam.getTestWords(testDict, spamDict, normDict, normFilelen, spamFilelen)
+    wordProbList = spam.get_test_words(testDict, spamDict, normDict, normFilelen, spamFilelen)
     # 对每封邮件得到的15个词计算贝叶斯概率
     p = spam.calBayes(wordProbList, spamDict, normDict)
     if (p > 0.9):
@@ -155,4 +165,3 @@ for i, ic in testResult.items():
     print(i + "/" + str(ic))
 
 print("Accuracy:" + str(testAccuracy))
-
