@@ -77,15 +77,14 @@ class SpamEmailBayes:
         ps_n = 1
 
         for word, prob in wordList.items():
-            print(word + "/" + str(prob))
+            print(f"Processing word: {word}, Probability: {prob:.4f}")
             ps_w *= (prob)
             ps_n *= (1 - prob)
-        p = ps_w / (ps_w + ps_n)
+        p = ps_w / (ps_w + ps_n + 1e-9) # Add epsilon for stability
         #         print(str(ps_w)+"////"+str(ps_n))
         return p
 
-        # 计算预测结果正确率
-
+    # 计算预测结果正确率
     def calAccuracy(self, testResult):
         rightCount = 0
         errorCount = 0
@@ -166,4 +165,3 @@ for i, ic in testResult.items():
     print(i + "/" + str(ic))
 
 print("Accuracy:" + str(testAccuracy))
-
