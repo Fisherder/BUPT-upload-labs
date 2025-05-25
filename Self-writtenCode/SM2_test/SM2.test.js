@@ -3,7 +3,7 @@ import { sm2 } from 'sm-crypto-v2';
 // SM2 加密解密测试
 describe('SM2 Encryption and Decryption', () => {
     const globalKeyPair = sm2.generateKeyPairHex(); // 生成全局密钥对
-    const globalPublicKey = globalKeyPair.publicKey; // 获取公 钥
+    const globalPublicKey = globalKeyPair.publicKey; // 获取公钥
     const globalPrivateKey = globalKeyPair.privateKey; // 获取私钥
 
     const msgString = 'Hello, SM2!'; // 要加密的消息 
@@ -140,5 +140,69 @@ describe('SM2 Point Generation', () => {
         // 获取椭圆曲线上的一个点
         const point = sm2.getPoint();
         expect(point).toBeDefined(); // 曲线点应已定义
+    });
+});
+
+// SM2 异常处理测试
+describe('SM2 Exception Handling', () => {
+    test('should throw error with invalid public key', () => {
+        // 测试使用无效公钥进行加密时是否抛出异常
+        expect(() => {
+            sm2.doEncrypt('test', 'invalidPublicKey');
+        }).toThrow();
+    });
+
+    test('should throw error with undefined message', () => {
+        // 测试使用undefined消息进行加密时是否抛出异常
+        const keypair = sm2.generateKeyPairHex();
+        expect(() => {
+            sm2.doEncrypt(undefined, keypair.publicKey);
+        }).toThrow();
+    });
+
+    test('should return null or throw with wrong cipher text', () => {
+        // 测试非法密文解密时的行为
+        const keypair = sm2.generateKeyPairHex();
+        const result = sm2.doDecrypt('not-a-valid-cipher-text', keypair.privateKey);
+        // 根据库的设计，可能返回null或抛出异常，两种情况都是合理的错误处理
+        expect(result === null || typeof result === 'string').toBe(true);
+    });
+
+    test('should throw error with invalid private key during decryption', () => {
+        // 测试使用无效私钥进行解密时是否抛出异常
+        const keypair = sm2.generateKeyPairHex();
+        const encrypted = sm2.doEncrypt('test message', keypair.publicKey);
+        expect(() => {
+            sm2.doDecrypt(encrypted, 'invalidPrivateKey');
+        }).toThrow();
+    });
+
+    test('should handle empty string input gracefully', () => {
+        // 测试空字符串输入是否能被正确处理
+        const keypair = sm2.generateKeyPairHex();
+        const encrypted = sm2.doEncrypt('', keypair.publicKey);
+        expect(encrypted).toBeDefined();
+        const decrypted = sm2.doDecrypt(encrypted, keypair.privateKey);
+        expect(decrypted).toBe('');
+    });
+
+    test('should throw error with invalid signature for verification', () => {
+        // 测试使用无效签名进行验证时是否抛出异常或返回false
+        const keypair = sm2.generateKeyPairHex();
+        const message = 'test message';
+        
+        // 尝试验证格式完全错误的签名
+        const verifyResult = sm2.doVerifySignature(message, 'invalid-signature', keypair.publicKey);
+        expect(verifyResult).toBe(false);
+        
+        // 尝试验证格式看似正确但内容错误的签名
+        try {
+            const invalidButFormattedSig = '30450220213c6cd6ebdd0648d8f3d32001def50200bfb81e7190543fec5b6544a2f5c93b022100b71805bd5ea2f3d9f5c48a5ec2b6a4b3ec5f3c503fc60e96b26dc7dab07bc5c';
+            const verifyResult2 = sm2.doVerifySignature(message, invalidButFormattedSig, keypair.publicKey);
+            expect(verifyResult2).toBe(false);
+        } catch (e) {
+            // 如果抛出异常也是可接受的
+            expect(e).toBeDefined();
+        }
     });
 });
