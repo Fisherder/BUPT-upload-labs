@@ -1,7 +1,6 @@
 import secrets
 import math
 import logging
-from typing import Tuple
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -47,7 +46,7 @@ def generate_prime(bits: int = 1024) -> int:
             return candidate
 
 
-def ex_gcd(a: int, b: int) -> Tuple[int, int, int]:
+def ex_gcd(a: int, b: int) -> tuple[int, int, int]:
     """Extended Euclidean algorithm. Returns (g, x, y) with ax + by = g = gcd(a, b)."""
     if a == 0:
         return b, 0, 1
@@ -63,7 +62,7 @@ def modinv(a: int, m: int) -> int:
     return x % m
 
 
-def rsa_keygen(bits: int = 2048) -> Tuple[Tuple[int, int], Tuple[int, int]]:
+def rsa_keygen(bits: int = 2048) -> tuple[tuple[int, int], tuple[int, int]]:
     """
     Generate RSA key pair.
     Returns ((n, e), (n, d)).
@@ -85,7 +84,7 @@ def rsa_keygen(bits: int = 2048) -> Tuple[Tuple[int, int], Tuple[int, int]]:
     return (n, e), (n, d)
 
 
-def rsa_encrypt(m: int, public_key: Tuple[int, int]) -> int:
+def rsa_encrypt(m: int, public_key: tuple[int, int]) -> int:
     """Encrypt integer m with public key (n, e)."""
     n, e = public_key
     if m < 0 or m >= n:
@@ -93,7 +92,7 @@ def rsa_encrypt(m: int, public_key: Tuple[int, int]) -> int:
     return pow(m, e, n)
 
 
-def rsa_decrypt(c: int, private_key: Tuple[int, int]) -> int:
+def rsa_decrypt(c: int, private_key: tuple[int, int]) -> int:
     """Decrypt integer c with private key (n, d)."""
     n, d = private_key
     if c < 0 or c >= n:
